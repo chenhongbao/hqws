@@ -8,6 +8,7 @@ import java.net.Socket;
 import java.nio.charset.Charset;
 import java.util.HashSet;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -46,27 +47,18 @@ public class HQInsideServer implements Runnable {
 
 			// Decide the type of JSON
 			try {
-				Result res;
-				
 				// Parse JSON
-				JSONObject o = new JSONObject(text);
-				
-				// Get type
-				String type = o.getString("_METADATA_");
-				switch (type) {
-				case MarketData.DataType:
-					res = svrCtx.subcribers.onMarketData(MarketData.Parse(o));
-					break;
-				case Candle.DataType:
-					res = svrCtx.subcribers.onCandle(Candle.Parse(o));
-					break;
-				default:
-					res = new Result(Result.Error, -1, "Unknown market data type, " + type);
+				// Compatible for both array and object
+				if (text.trim().startsWith("[")) {
+					JSONArray arr = new JSONArray(text);
+					onJSONArray(arr);
 				}
-				
-				// Process result
-				if (res.equals(Result.Error)) {
-					svrCtx.LOG.warning("Sending data failed, " + res.Message);
+				else if (text.trim().startsWith("{")) {
+					JSONObject o = new JSONObject(text);
+					onJSONObject(o);
+				}
+				else {
+					svrCtx.LOG.warning("Invalid JSON string, " + text);
 				}
 			} catch (JSONException e) {
 				svrCtx.LOG.warning("Parsing JSON market data failed, " + e.getMessage());
@@ -80,6 +72,35 @@ public class HQInsideServer implements Runnable {
 
 		@Override
 		public void OnHearbeatError(Result Reason) {
+		}
+		
+		public void onJSONArray(JSONArray arr) {
+			for (int i = 0; i < arr.length(); ++i) {
+				JSONObject o = arr.getJSONObject(i);
+				onJSONObject(o);
+			}
+		}
+		
+		public void onJSONObject(JSONObject o) {
+			Result res;
+			
+			// Get type
+			String type = o.getString("_METADATA_");
+			switch (type) {
+			case MarketData.DataType:
+				res = svrCtx.subcribers.onMarketData(MarketData.Parse(o));
+				break;
+			case Candle.DataType:
+				res = svrCtx.subcribers.onCandle(Candle.Parse(o));
+				break;
+			default:
+				res = new Result(Result.Error, -1, "Unknown market data type, " + type);
+			}
+			
+			// Process result
+			if (res.equals(Result.Error)) {
+				svrCtx.LOG.warning("Sending data failed, " + res.Message);
+			}
 		}
 
 	}
