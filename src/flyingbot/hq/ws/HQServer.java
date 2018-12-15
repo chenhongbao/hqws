@@ -123,8 +123,8 @@ public class HQServer {
 
 		// Prepare binding address
 		int port = getListenPort();
-		System.out.println("行情WS服务监听端口：" + port);
-		serverCtx.LOG.info("行情WS服务监听端口：" + port);
+		System.out.println("HQServer is listening on port: " + port);
+		serverCtx.LOG.info("HQServer is listening on port: " + port);
 		
 		// Create server instance
 		final HQServer endpoint = new HQServer();
