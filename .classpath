@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="com_src"/>
+	<classpathentry kind="lib" path="lib/netty-all-4.1.30.Final.jar" sourcepath="D:/Program Files/netty-4.1.30.Final/jar/all-in-one/netty-all-4.1.30.Final-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/D:/Program%20Files/netty-4.1.30.Final/javadoc/netty-all-4.1.30.Final-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="lib/mysql-connector-java-8.0.12.jar" sourcepath="D:/Program Files/mysql-connector-java-8.0.12/src"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
