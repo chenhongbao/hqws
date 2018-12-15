@@ -108,6 +108,10 @@ public class HQInsideServer implements Runnable {
 	public HQInsideServer(HQServerContext ctx) {
 		this.svrCtx = ctx;
 		this.connections = new HashSet<SocketDuplex>();
+		this.port = getListenPort();
+		
+		// Run server
+		Common.GetSingletonExecSvc().execute(this);
 	}
 
 	protected int getListenPort() {
