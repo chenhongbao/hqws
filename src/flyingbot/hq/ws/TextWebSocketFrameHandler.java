@@ -86,7 +86,7 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 			// Test if the path matches instrument id
 			Matcher m = patt.matcher(rawInst);
 			if (m.find()) {
-				String inst = path.substring(m.start());
+				String inst = rawInst.substring(m.start());
 				if (subs.contains(inst)) {
 					svrCtx.LOG.warning("Client subscribe duplicated instrument, " + inst);
 				}
@@ -143,11 +143,17 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 				for (int i = 0; i < arr.length(); ++i) {
 					String inst = arr.getString(i);
 					if (o.getString("type").compareTo(DataType_Sub) == 0) {
-						// Subscribe
-						svrCtx.subcribers.subscribe(inst, ctx.channel());
-						
-						// Send initial history data
-						svrCtx.subcribers.sendHistoryData(inst, ctx.channel(), numberCandle);
+						// Duplicated subscription
+						if (subs.contains(inst)) {
+							svrCtx.LOG.warning("Client subscribe duplicated instrument, " + inst);
+						}
+						else {
+							// Subscribe
+							svrCtx.subcribers.subscribe(inst, ctx.channel());
+							
+							// Send initial history data
+							svrCtx.subcribers.sendHistoryData(inst, ctx.channel(), numberCandle);
+						}
 					}
 					else {
 						// Unsubscribe
