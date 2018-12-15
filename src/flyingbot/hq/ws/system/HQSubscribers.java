@@ -34,6 +34,9 @@ public class HQSubscribers {
 	public final static String TypeTag = "type";
 	public final static String SequenceTag = "sequence";
 	
+	// Send timeout
+	public final static int SendTimeoutMillis = 5000;
+	
 	// Sequence
 	AtomicLong sequence;
 	
@@ -136,10 +139,14 @@ public class HQSubscribers {
 			
 			// Send data
 			String msg = wrapData(Candle.DataType, sequence.incrementAndGet(), arr);
-			Result r = broadcast(inst, msg);
-			if (r.equals(Result.Error)) {
-				LOG.warning("Sending initial history data failed, " + inst + ", PERIOD: " + p + "m");
-			}
+			try {
+				boolean ret = c.writeAndFlush(new TextWebSocketFrame(msg)).await(SendTimeoutMillis);
+				if (!ret) {
+					LOG.warning("Sending timeout, CLIENT: " + c);
+				}
+			} catch (InterruptedException e) {
+				LOG.warning("Sending data failed, " + c + ", " + e.getMessage());
+			}		
 		}
 	}
 	
@@ -172,6 +179,7 @@ public class HQSubscribers {
 	}
 	
 	protected Result broadcast(String inst, String msg) {
+		Result res = new Result();
 		rwLock.readLock().lock();
 		
 		// Check if instrument recod found
@@ -190,11 +198,18 @@ public class HQSubscribers {
 		}
 		
 		// Write data to group
-		g.writeAndFlush(new TextWebSocketFrame(msg));
+		try {
+			boolean ret = g.writeAndFlush(new TextWebSocketFrame(msg)).await(SendTimeoutMillis);
+			if (!ret) {
+				res = new Result(Result.Error, -1, "Sending timeout, " + inst + ", msg length: " + msg.length() + " bytes.");
+			}
+		} catch (InterruptedException e) {
+			res = new Result(Result.Error, -1, "Sending data failed, " + e.getMessage());
+		}
 		
 		// unlock
 		rwLock.readLock().unlock();
-		return new Result();
+		return res;
 	}
 	
 	public void closeAll() {

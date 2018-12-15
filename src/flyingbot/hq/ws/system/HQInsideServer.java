@@ -46,17 +46,27 @@ public class HQInsideServer implements Runnable {
 
 			// Decide the type of JSON
 			try {
+				Result res;
+				
+				// Parse JSON
 				JSONObject o = new JSONObject(text);
+				
+				// Get type
 				String type = o.getString("_METADATA_");
 				switch (type) {
 				case MarketData.DataType:
-					svrCtx.subcribers.onMarketData(MarketData.Parse(o));
+					res = svrCtx.subcribers.onMarketData(MarketData.Parse(o));
 					break;
 				case Candle.DataType:
-					svrCtx.subcribers.onCandle(Candle.Parse(o));
+					res = svrCtx.subcribers.onCandle(Candle.Parse(o));
 					break;
 				default:
-					svrCtx.LOG.warning("Unknown market data type, " + type);
+					res = new Result(Result.Error, -1, "Unknown market data type, " + type);
+				}
+				
+				// Process result
+				if (res.equals(Result.Error)) {
+					svrCtx.LOG.warning("Sending data failed, " + res.Message);
 				}
 			} catch (JSONException e) {
 				svrCtx.LOG.warning("Parsing JSON market data failed, " + e.getMessage());
