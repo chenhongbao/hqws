@@ -105,6 +105,8 @@ public class HQDataKeeper {
 					wrLock.writeLock().unlock();
 					return;
 				}
+				
+				// Larger SerialNo to the front(left), smaller to the right
 				if (Cnd.SerialNo.compareTo(lst.get(i).SerialNo) > 0) {
 					lst.add(i, Cnd);
 					inserted = true;
@@ -141,7 +143,9 @@ public class HQDataKeeper {
 				// FIFO
 				mds.remove(0);
 			}
-			mds.add(Md);
+			
+			// Add element to the front
+			mds.add(0, Md);
 			wrLock0.writeLock().unlock();
 		}
 		

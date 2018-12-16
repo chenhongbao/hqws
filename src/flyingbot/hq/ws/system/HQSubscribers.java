@@ -139,14 +139,33 @@ public class HQSubscribers {
 			
 			// Send data
 			String msg = wrapData(Candle.DataType, sequence.incrementAndGet(), arr);
-			try {
-				boolean ret = c.writeAndFlush(new TextWebSocketFrame(msg)).await(SendTimeoutMillis);
-				if (!ret) {
-					LOG.warning("Sending timeout, CLIENT: " + c);
-				}
-			} catch (InterruptedException e) {
-				LOG.warning("Sending data failed, " + c + ", " + e.getMessage());
-			}		
+			sendChannelData(c, msg);	
+		}
+		
+		// Send market data
+		List<MarketData> l = dataKeeper.queryMarketData(inst, 10);
+		if (l.size() > 0) {
+			// Prepare JSON
+			JSONObject[] arr = new JSONObject[l.size()];
+			int i = 0;
+			for (MarketData d : l) {
+				arr[i++] = d.ToJSON();
+			}
+			
+			// Get JSON string
+			String msg = wrapData(MarketData.DataType, sequence.incrementAndGet(), arr);
+			sendChannelData(c, msg);
+		}
+	}
+	
+	protected void sendChannelData(Channel c, String msg) {
+		try {
+			boolean ret = c.writeAndFlush(new TextWebSocketFrame(msg)).await(SendTimeoutMillis);
+			if (!ret) {
+				LOG.warning("Sending timeout, CLIENT: " + c);
+			}
+		} catch (InterruptedException e) {
+			LOG.warning("Sending data failed, " + c + ", " + e.getMessage());
 		}
 	}
 	
