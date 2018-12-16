@@ -186,7 +186,7 @@ public class HQSubscribers {
 		if (!subscription.containsKey(inst)) {
 			//unlock
 			rwLock.readLock().unlock();
-			return new Result(Result.Error, -1, "Instrument record not found.");
+			return new Result(Result.Success, 0, "No subscription.");
 		}
 		
 		// Get the ChannelGroup
