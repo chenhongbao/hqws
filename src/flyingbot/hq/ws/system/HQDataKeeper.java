@@ -29,11 +29,14 @@ public class HQDataKeeper {
 		// Default cached market data number
 		public static final int DefaultCachedMarketData = 10;
 		
+		// Older data to left, newer data to right. Send data client in this order,
+		// so client will receive older data earlier than newer.
+		//
 		// Candle cache, key: period in minutes, value: candle list
 		HashMap<Integer, LinkedList<Candle>> candles;
 		
 		// Market data cache
-		List<MarketData> mds;
+		LinkedList<MarketData> mds;
 		
 		// Sync
 		ReadWriteLock wrLock, wrLock0;
@@ -72,7 +75,7 @@ public class HQDataKeeper {
 				ret = new LinkedList<Candle>();
 				
 				// subList([inclusive], [exclusive])
-				ret.addAll(candles.get(period).subList(0, len));
+				ret.addAll(candles.get(period).subList(lst.size() - len, len));
 			}
 			
 			// unlock
@@ -99,24 +102,24 @@ public class HQDataKeeper {
 				wrLock.writeLock().unlock();
 				return;
 			}
-			for (int i = 0; i < lst.size(); ++i) {
+			for (int i = lst.size() - 1; i >= 0; --i) {
 				if (Cnd.SerialNo.compareTo(lst.get(i).SerialNo) == 0) {
 					// Repeated candle
 					wrLock.writeLock().unlock();
 					return;
 				}
 				
-				// Larger SerialNo to the front(left), smaller to the right
+				// Newer to the right, older to the left
 				if (Cnd.SerialNo.compareTo(lst.get(i).SerialNo) > 0) {
-					lst.add(i, Cnd);
+					lst.add(i + 1, Cnd);
 					inserted = true;
 					break;
 				}
 			}
 			
-			// Candle not inserted, append it to the last
+			// Candle not inserted, append it to the front
 			if (!inserted) {
-				lst.addLast(Cnd);
+				lst.addFirst(Cnd);
 			}
 			wrLock.writeLock().unlock();
 		}
@@ -141,11 +144,11 @@ public class HQDataKeeper {
 			wrLock0.writeLock().lock();
 			while (mds.size() >= DefaultCachedMarketData) {
 				// FIFO
-				mds.remove(0);
+				mds.removeFirst();
 			}
 			
-			// Add element to the front
-			mds.add(0, Md);
+			// Add element to the back, send to client from left to right, old to new
+			mds.addLast(Md);
 			wrLock0.writeLock().unlock();
 		}
 		
