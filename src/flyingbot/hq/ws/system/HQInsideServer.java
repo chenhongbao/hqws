@@ -23,7 +23,7 @@ public class HQInsideServer implements Runnable {
 	HQServerContext svrCtx;
 
 	// Default listening port
-	private final static int DefaultListenPort = 9001;
+	private final static int DefaultListenPort = 9101;
 	private int port = 0;
 
 	// Alive connection

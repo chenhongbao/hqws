@@ -62,6 +62,10 @@ public class HQServer {
 	// Logger
 	private static HQServerContext serverCtx;
 	
+	// HQInsideServer, ref holder
+	@SuppressWarnings("unused")
+	private static HQInsideServer insideServer;
+	
 	public ChannelFuture start(InetSocketAddress address) {
 		// Create server bootstrap
 		ServerBootstrap bootstrap = new ServerBootstrap();
@@ -119,7 +123,7 @@ public class HQServer {
 		serverCtx = new HQServerContext();
 		
 		// Run inside HQ server
-		Common.GetSingletonExecSvc().execute(new HQInsideServer(serverCtx));
+		insideServer = new HQInsideServer(serverCtx);
 
 		// Prepare binding address
 		int port = getListenPort();

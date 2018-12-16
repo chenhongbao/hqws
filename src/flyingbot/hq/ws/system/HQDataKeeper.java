@@ -361,8 +361,7 @@ public class HQDataKeeper {
 	}
 	
 	private void loadConfiguration() throws Exception {
-		JSONObject obj = Common.LoadJSONObject(
-				this.getClass().getResource("candledb_addr.json").getFile());
+		JSONObject obj = Common.LoadJSONObject(this.getClass().getResourceAsStream("candledb_addr.json"));
 		if (obj.has("URL") && obj.has("Username") && obj.has("Password")) {
 			URL = obj.getString("URL");
 			userName = obj.getString("Username");
