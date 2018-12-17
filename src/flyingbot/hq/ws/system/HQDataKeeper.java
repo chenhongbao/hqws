@@ -75,7 +75,7 @@ public class HQDataKeeper {
 				ret = new LinkedList<Candle>();
 				
 				// subList([inclusive], [exclusive])
-				ret.addAll(candles.get(period).subList(lst.size() - len, len));
+				ret.addAll(candles.get(period).subList(lst.size() - len, lst.size()));
 			}
 			
 			// unlock
@@ -222,29 +222,14 @@ public class HQDataKeeper {
 	}
 	
 	public Set<Integer> getCandlePeriods(String inst) {
-		boolean has = false;
-		
-		// Check if candle record exists
-		lock.readLock().lock();
-		has = instPacks.containsKey(inst);
-		
-		if (!has) {		
-			lock.readLock().unlock();
-			
-			// Return default values
-			Set<Integer> r = new HashSet<Integer>();
-			r.add(1);
-			r.add(5);
-			r.add(15);
-			r.add(60);
-			r.add(1440);
-			return r;
-		}
-		else {
-			Set<Integer> ret = instPacks.get(inst).getCandlePeriods();
-			lock.readLock().unlock();
-			return ret;
-		}
+		// Return default values
+		Set<Integer> r = new HashSet<Integer>();
+		r.add(1);
+		r.add(5);
+		r.add(15);
+		r.add(60);
+		r.add(1440);
+		return r;
 	}
 	
 	public List<Candle> getCandles(String InstrumentID, int Period, int ReversedNumber) {
