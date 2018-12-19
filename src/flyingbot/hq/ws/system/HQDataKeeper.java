@@ -194,6 +194,13 @@ public class HQDataKeeper {
 		}
 	}
 	
+	public boolean removeInstPack(String inst) {
+		lock.writeLock().lock();
+		boolean ret = instPacks.remove(inst) != null;
+		lock.writeLock().unlock();	
+		return ret;
+	}
+	
 	public List<MarketData> queryMarketData(String InstrumentID, int Number) {
 		boolean has = false;
 		

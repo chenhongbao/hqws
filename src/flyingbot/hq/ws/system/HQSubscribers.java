@@ -1,6 +1,9 @@
 package flyingbot.hq.ws.system;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -22,9 +25,94 @@ import io.netty.util.concurrent.ImmediateEventExecutor;
 
 public class HQSubscribers {
 	
+	class ModifiedLRU {
+		// Subscribed instruments
+		protected HashSet<String> instSet;
+		
+		// LRU list
+		protected LinkedList<String> instList;
+		protected ReentrantReadWriteLock lock;
+		
+		// Cache size
+		int size;
+		
+		public ModifiedLRU(int size) {
+			if (size < 1) {
+				size = 1;
+			}
+			this.size = size;
+			instSet = new HashSet<String>();
+			instList = new LinkedList<String>();
+			lock = new ReentrantReadWriteLock();
+		}
+		
+		/**
+		 * Refresh LRU list and return the removed element (outbound size)
+		 * @param inst Instrument
+		 * @return Instrument which is removed out of the list or null if nothing performed
+		 */
+		public String refreshInst(String inst) {
+			lock.writeLock().lock();
+			
+			// New instrument
+			if (!instSet.contains(inst)) {
+				// Update list
+				instSet.add(inst);
+				instList.addFirst(inst);
+				
+				// Check if needs remove the last element
+				if (instList.size() > this.size) {
+					String i = instList.pollLast();
+					instSet.remove(i);
+					
+					lock.writeLock().unlock();
+					return i;
+				}
+				else {
+					lock.writeLock().unlock();
+					return null;
+				}
+			}
+			else {
+				// Remove the current element
+				for (int i = 0; i<instList.size(); ++i) {
+					if (instList.get(i).compareToIgnoreCase(inst) == 0) {
+						instList.remove(i);
+						break;
+					}
+				}
+				
+				// Add to the front
+				instList.addFirst(inst);
+				
+				lock.writeLock().unlock();
+				return null;
+			}
+		}
+		
+		public boolean contains(String inst) {
+			boolean ret = false;
+			lock.readLock().lock();
+			ret = instSet.contains(inst);
+			lock.readLock().unlock();
+			return ret;
+		}
+		
+		public List<String> getAll() {
+			List<String> ret = new ArrayList<String>();
+			lock.readLock().lock();
+			ret.addAll(instList);
+			lock.readLock().unlock();
+			return ret;
+		}
+	}
+	
 	// Subscription group
 	protected ReentrantReadWriteLock rwLock;
 	protected HashMap<String, ChannelGroup> subscription;
+	
+	// LRU
+	protected ModifiedLRU lru;
 	
 	// Market data keeper
 	public HQDataKeeper dataKeeper;
@@ -36,6 +124,9 @@ public class HQSubscribers {
 	
 	// Send timeout
 	public final static int SendTimeoutMillis = 5000;
+	
+	// LRU size
+	public final static int LRUSize = 50;
 	
 	// Sequence
 	AtomicLong sequence;
@@ -52,6 +143,9 @@ public class HQSubscribers {
 		
 		// Set logger
 		LOG = log;
+		
+		// LRU
+		lru = new ModifiedLRU(LRUSize);
 		
 		// Create subscription record
 		rwLock = new ReentrantReadWriteLock();
@@ -72,12 +166,34 @@ public class HQSubscribers {
 			
 			// unlock
 			rwLock.writeLock().unlock();
+			
+			// Refresh LRU
+			refreshLRU(inst);
+			
 			return new Result();
 		}
 		else {
 			// unlock
 			rwLock.writeLock().unlock();
 			return new Result(Result.Error, -1, "Duplecated subscription.");
+		}
+	}
+	
+	protected void refreshLRU(String inst) {
+		if (!lru.contains(inst)) {
+			LOG.info("New cache: " + inst);
+		}
+		
+		// Refresh LRU
+		String r = lru.refreshInst(inst);
+		if (r != null) {
+			boolean ret = dataKeeper.removeInstPack(r);
+			if (ret) {
+				LOG.info("Remove " + r + " from cache.");
+			}
+			else {
+				LOG.warning("Remove " + r + " from cache failed.");
+			}
 		}
 	}
 
@@ -102,19 +218,29 @@ public class HQSubscribers {
 		return new Result();
 	}
 	
-	public Result onMarketData(MarketData d) {
+	public Result onMarketData(MarketData d) {	
+		// Forward data
 		Result r = sendData(d.InstrumentID, MarketData.DataType, d);
-		dataKeeper.onMarketData(d);
+		
+		// Only update data that is marked in LRU
+		if (lru.contains(d.InstrumentID)) {
+			dataKeeper.onMarketData(d);
+		}
 		return r;
 	}
 	
 	public Result onCandle(Candle c) {
 		Result r = sendData(c.InstrumentID, Candle.DataType, c);
-		dataKeeper.onCandle(c);
+		if (lru.contains(c.InstrumentID)) {
+			dataKeeper.onCandle(c);
+		}
 		return r;
 	}
 	
 	public void sendHistoryData(String inst, Channel c, int number) {
+		// Refresh LRU
+		refreshLRU(inst);
+		
 		// Get all periods
 		Set<Integer> periods = dataKeeper.getCandlePeriods(inst);
 		if (periods.size() < 1) {
