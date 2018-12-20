@@ -131,7 +131,7 @@ public class HQSubscribers {
 	public final static int SendTimeoutMillis = 5000;
 	
 	// LRU size
-	public final static int LRUSize = 50;
+	public final static int LRUSize = 5;
 	
 	// Sequence
 	AtomicLong sequence;
@@ -242,10 +242,7 @@ public class HQSubscribers {
 		return r;
 	}
 	
-	public void sendHistoryData(String inst, Channel c, int number) {
-		// Refresh LRU
-		refreshLRU(inst);
-		
+	public void sendHistoryData(String inst, Channel c, int number) {	
 		// Get all periods
 		Set<Integer> periods = dataKeeper.getCandlePeriods(inst);
 		if (periods.size() < 1) {
