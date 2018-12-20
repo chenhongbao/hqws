@@ -56,34 +56,39 @@ public class HQSubscribers {
 			
 			// New instrument
 			if (!instSet.contains(inst)) {
-				// Update list
-				instSet.add(inst);
-				instList.addFirst(inst);
+				String ret = null;
 				
 				// Check if needs remove the last element
-				if (instList.size() > this.size) {
-					String i = instList.pollLast();
-					instSet.remove(i);
-					
-					lock.writeLock().unlock();
-					return i;
+				if (instList.size() >= this.size) {
+					ret = instList.pollLast();
+					instSet.remove(ret);
 				}
-				else {
-					lock.writeLock().unlock();
-					return null;
-				}
+				
+				// Update list
+				instSet.add(inst);
+				instList.addLast(inst);
+				
+				return ret;
 			}
 			else {
+				int index = -1;
 				// Remove the current element
 				for (int i = 0; i<instList.size(); ++i) {
 					if (instList.get(i).compareToIgnoreCase(inst) == 0) {
 						instList.remove(i);
+						index = i;
 						break;
 					}
 				}
 				
-				// Add to the front
-				instList.addFirst(inst);
+				// Move element to left
+				if (index <= 0) {
+					index = 0;
+				}
+				else {
+					--index;
+				}
+				instList.add(index, inst);
 				
 				lock.writeLock().unlock();
 				return null;
