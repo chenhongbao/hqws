@@ -131,7 +131,7 @@ public class HQSubscribers {
 	public final static int SendTimeoutMillis = 5000;
 	
 	// LRU size
-	public final static int LRUSize = 5;
+	public final static int LRUSize = 50;
 	
 	// Sequence
 	AtomicLong sequence;

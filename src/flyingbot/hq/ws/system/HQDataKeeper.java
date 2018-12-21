@@ -55,7 +55,8 @@ public class HQDataKeeper {
 		 * @return Candle list
 		 */
 		public List<Candle> queryCandle(int period, int reversedNumber) {
-			List<Candle> ret = null;
+			// Always return an instance, prohibit null exception
+			List<Candle> ret = new LinkedList<Candle>();
 			
 			// Sync
 			wrLock.readLock().lock();
@@ -69,10 +70,7 @@ public class HQDataKeeper {
 				}
 				
 				// Calculate the number of candles return
-				int len = Math.min(lst.size(), reversedNumber);
-				
-				// Return list
-				ret = new LinkedList<Candle>();
+				int len = Math.min(lst.size(), reversedNumber); 
 				
 				// subList([inclusive], [exclusive])
 				ret.addAll(candles.get(period).subList(lst.size() - len, lst.size()));
@@ -240,27 +238,28 @@ public class HQDataKeeper {
 	}
 	
 	public List<Candle> getCandles(String InstrumentID, int Period, int ReversedNumber) {
-		boolean has = false;
+		InstCandlePack icp = null;
 		
 		// Check id record exists
 		lock.readLock().lock();
-		has = instPacks.containsKey(InstrumentID);
+		icp = instPacks.get(InstrumentID);
 		lock.readLock().unlock();
 		
 		// Create candle record if not exists
-		if (!has) {
+		if (icp == null) {
 			lock.writeLock().lock();
-			// Reconfirm
+			// Re-confirm
 			if (!instPacks.containsKey(InstrumentID)) {
 				instPacks.put(InstrumentID, new InstCandlePack());
 			}
+			
+			// Get instance again
+			icp = instPacks.get(InstrumentID);
 			lock.writeLock().unlock();
 		}
 		
-		// Readlock
-		lock.readLock().lock();
-		List<Candle> lst = instPacks.get(InstrumentID).queryCandle(Period, ReversedNumber);
-		lock.readLock().unlock();
+		// Query candles
+		List<Candle> lst = icp.queryCandle(Period, ReversedNumber);
 		
 		// Have enough data
 		if (lst != null && lst.size() >= ReversedNumber) {
@@ -271,21 +270,17 @@ public class HQDataKeeper {
 			lst = loadCandleFromDB(InstrumentID, Period, ReversedNumber);
 			
 			if (lst != null) {
-				// Read lock
-				lock.readLock().lock();
-				InstCandlePack icp = instPacks.get(InstrumentID);
-				lock.readLock().unlock();
-				
 				// Merge newly queried data into cache
+				// (cache may have been removed at this point, but it doesn't matter)
 				for (Candle cnd : lst) {
 					icp.insertCandle(cnd);
 				}
 			}
 			
-			// Look up candle from cache again
-			lock.readLock().lock();
-			lst = instPacks.get(InstrumentID).queryCandle(Period, ReversedNumber);
-			lock.readLock().unlock();
+			// Look up candle from cache again.
+			// If the original cache has been removed,it will still do query 
+			// and send candles to client, but it won't put it to cache.
+			lst = icp.queryCandle(Period, ReversedNumber);
 			
 			return lst;
 		}
