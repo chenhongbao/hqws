@@ -52,12 +52,11 @@ public class HQSubscribers {
 		 * @return Instrument which is removed out of the list or null if nothing performed
 		 */
 		public String refreshInst(String inst) {
+			String ret = null;
 			lock.writeLock().lock();
 			
 			// New instrument
 			if (!instSet.contains(inst)) {
-				String ret = null;
-				
 				// Check if needs remove the last element
 				if (instList.size() >= this.size) {
 					ret = instList.pollLast();
@@ -67,8 +66,6 @@ public class HQSubscribers {
 				// Update list
 				instSet.add(inst);
 				instList.addLast(inst);
-				
-				return ret;
 			}
 			else {
 				int index = -1;
@@ -89,10 +86,10 @@ public class HQSubscribers {
 					--index;
 				}
 				instList.add(index, inst);
-				
-				lock.writeLock().unlock();
-				return null;
 			}
+			
+			lock.writeLock().unlock();
+			return ret;
 		}
 		
 		public boolean contains(String inst) {
