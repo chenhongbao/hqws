@@ -124,6 +124,10 @@ public class HQSubscribers {
 	public final static String TypeTag = "type";
 	public final static String SequenceTag = "sequence";
 	
+	// JSON type field, marking the data is historical
+	public final static String OldCandleType = "OldCandle";
+	public final static String OldMarketDataType = "OldMarketData";
+	
 	// Send timeout
 	public final static int SendTimeoutMillis = 5000;
 	
@@ -290,7 +294,7 @@ public class HQSubscribers {
 			}
 			
 			// Send data
-			String msg = wrapData(Candle.DataType, sequence.incrementAndGet(), arr);
+			String msg = wrapData(OldCandleType, sequence.incrementAndGet(), arr);
 			sendChannelData(c, msg);	
 		}
 		
@@ -305,7 +309,7 @@ public class HQSubscribers {
 			}
 			
 			// Get JSON string
-			String msg = wrapData(MarketData.DataType, sequence.incrementAndGet(), arr);
+			String msg = wrapData(OldMarketDataType, sequence.incrementAndGet(), arr);
 			sendChannelData(c, msg);
 		}
 	}
