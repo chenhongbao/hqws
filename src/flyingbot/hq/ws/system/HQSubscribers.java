@@ -253,24 +253,24 @@ public class HQSubscribers {
 			// Day candles are a lot less than 1m candles.
 			int num = number;
 			
-			// Half a year is enough
-			if (p == 1440 && number > 120) {
-				num = 120;
+			// 240 days a year
+			if (p == 1440 && number > 240) {
+				num = 240;
 			}
 			
 			// 6 housr each day
-			if (p == 60 && number > 720) {
-				num = 720;
+			if (p == 60 && number > 1440) {
+				num = 1440;
 			}
 			
 			// 4 quarters each hour
-			if (p == 15 && number > 2880) {
-				num = 2880;
+			if (p == 15 && number > 5760) {
+				num = 5760;
 			}
 			
 			// 3 5-minutes each quarter
-			if (p == 5 && number > 8640) {
-				num = 8640;
+			if (p == 5 && number > 17280) {
+				num = 17280;
 			}
 			
 			// Query candles
