@@ -78,7 +78,11 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 			// Parse instrument id and candle number
 			if (path.indexOf('?') != -1) {
 				rawInst = path.substring(0, path.indexOf('?'));
-				numberCandle = Integer.parseInt(getURLValue(candleNum, path.substring(path.indexOf('?') + 1)));
+				int tmp = Integer.parseInt(getURLValue(candleNum, path.substring(path.indexOf('?') + 1)));
+				if (tmp > 0)
+				{
+					numberCandle = tmp;
+				}	
 			} else {
 				rawInst = path;
 			}
