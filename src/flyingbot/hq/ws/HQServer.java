@@ -127,8 +127,8 @@ public class HQServer {
 
 		// Prepare binding address
 		int port = getListenPort();
-		System.out.println("HQServer is listening on port: " + port);
-		serverCtx.LOG.info("HQServer is listening on port: " + port);
+		System.out.println("HQWS is listening on port: " + port);
+		serverCtx.LOG.info("HQWS is listening on port: " + port);
 		
 		// Create server instance
 		final HQServer endpoint = new HQServer();

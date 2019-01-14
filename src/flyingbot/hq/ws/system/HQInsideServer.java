@@ -135,8 +135,8 @@ public class HQInsideServer implements Runnable {
 			ss = new ServerSocket(port);
 			
 			// Log info
-			System.out.println("Inside server is listening on port: " + port);
-			svrCtx.LOG.info("Inside server is listening on port: " + port);
+			System.out.println("HQInside is listening on port: " + port);
+			svrCtx.LOG.info("HQInside is listening on port: " + port);
 		} catch (IOException e) {
 			Common.PrintException(e);
 			return;
