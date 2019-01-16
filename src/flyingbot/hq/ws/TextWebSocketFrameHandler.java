@@ -32,6 +32,9 @@ import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
  * }
  * </pre>
  * 
+ * Add GET parameter 'candlenumber' to the URL and get the given number of old canldes.
+ * <li> ws://localhost:8080/(service-path)/(instrument)?candlenumber=555
+ * 
  * Client will not have response if subscription fails, in the cases that there
  * are not available instrument.
  */
