@@ -182,5 +182,6 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 
 		// Don't need to un-subscribe instruments when Channel is closed.
 		// The ChannelGroup will manage the closed channels.
+		svrCtx.LOG.info("Disconnect " + ctx.channel());
 	}
 }
