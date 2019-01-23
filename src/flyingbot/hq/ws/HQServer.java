@@ -4,6 +4,7 @@ import java.net.InetSocketAddress;
 import org.json.JSONObject;
 
 import dmkp.common.util.Common;
+import dmkp.common.util.Result;
 import flyingbot.hq.ws.system.HQInsideServer;
 import flyingbot.hq.ws.system.HQServerContext;
 import io.netty.bootstrap.ServerBootstrap;
@@ -81,6 +82,28 @@ public class HQServer {
 		
 		// Server listening channel, for client's connection
 		channel = future.channel();
+		
+		// Heartbeat deamon
+		Common.GetSingletonExecSvc().execute(new Runnable() {
+
+			@Override
+			public void run() {
+				while (true) {
+					try {
+						// prime number
+						Thread.sleep(17 * 1000);
+					} catch (InterruptedException e) {
+					}
+					
+					// Send heartbeats
+					Result r = serverCtx.subcribers.SendHeartbeatAll();
+					if (r.equals(Result.Error)) {
+						serverCtx.LOG.warning(r.Message);
+					}
+				}
+			}
+			
+		});
 		
 		// Return statement
 		return future;

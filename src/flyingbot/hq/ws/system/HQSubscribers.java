@@ -134,6 +134,9 @@ public class HQSubscribers {
 	// LRU size
 	public final static int LRUSize = 50;
 	
+	// Heartbeat message
+	public final static String HeartbeatMsg = "{\"sequence\":0,\"type\":\"heartbeat\",\"data\":[]}";
+	
 	// Sequence
 	AtomicLong sequence;
 	
@@ -380,6 +383,34 @@ public class HQSubscribers {
 			}
 		} catch (InterruptedException e) {
 			res = new Result(Result.Error, -1, "Sending data failed, " + e.getMessage());
+		}
+		
+		// unlock
+		rwLock.readLock().unlock();
+		return res;
+	}
+	
+	public Result SendHeartbeatAll() {
+		Result res = new Result();
+		rwLock.readLock().lock();
+		
+		for (ChannelGroup g : subscription.values())
+		{
+			if (g == null)
+			{
+				continue;
+			}
+			
+			try {
+				boolean ret = g.writeAndFlush(new TextWebSocketFrame(HQSubscribers.HeartbeatMsg)).await(SendTimeoutMillis);
+				if (!ret) {
+					res = new Result(Result.Error, -1, "Sending heartbeat timeout.");
+					break;
+				}
+			} catch (InterruptedException e) {
+				res = new Result(Result.Error, -1, "Sending heartbeat failed, " + e.getMessage());
+				break;
+			}
 		}
 		
 		// unlock
