@@ -135,7 +135,7 @@ public class HQSubscribers {
 	public final static int LRUSize = 50;
 	
 	// Heartbeat message
-	public final static String HeartbeatMsg = "{\"sequence\":0,\"type\":\"heartbeat\",\"data\":[]}";
+	public final static String HeartbeatMsg = "{\"sequence\":0,\"type\":\"Heartbeat\",\"data\":[]}";
 	
 	// Sequence
 	AtomicLong sequence;
