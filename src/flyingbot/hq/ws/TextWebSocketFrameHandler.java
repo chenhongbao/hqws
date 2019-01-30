@@ -103,6 +103,9 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 
 					// Send initial history data
 					svrCtx.subcribers.sendHistoryData(inst, ctx.channel(), numberCandle);
+					
+					// Log info
+					svrCtx.LOG.info("Client joins subscription pool, " + inst + ", " + ctx.channel());
 				}
 			} else {
 				// Wrong input from client
