@@ -13,8 +13,8 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.oio.OioEventLoopGroup;
-import io.netty.channel.socket.oio.OioServerSocketChannel;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
@@ -52,7 +52,7 @@ public class HQServer {
 	}
 	
 	// For short request like WebSocket, Old IO is more efficient.
-	private final EventLoopGroup group = new OioEventLoopGroup();
+	private final EventLoopGroup group = new NioEventLoopGroup();
 	
 	// Channel
 	private Channel channel;
@@ -73,7 +73,7 @@ public class HQServer {
 		
 		// Setup bootstrap
 		bootstrap.group(group);
-		bootstrap.channel(OioServerSocketChannel.class);
+		bootstrap.channel(NioServerSocketChannel.class);
 		bootstrap.childHandler(new ChatServerInitializer(serverCtx));
 		
 		// Bind address
