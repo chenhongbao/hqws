@@ -1,0 +1,5 @@
+{
+	"URL" : "jdbc:mysql://localhost:43306/candledb",
+	"Username" : "logger",
+	"Password" : "chb_1987_1013"
+}
