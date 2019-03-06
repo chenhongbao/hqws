@@ -1,0 +1,3 @@
+Manifest-Version: 1.0
+Main-Class: flyingbot.it.hq.ws.HQServer
+

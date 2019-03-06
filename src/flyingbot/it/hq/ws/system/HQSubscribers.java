@@ -292,7 +292,10 @@ public class HQSubscribers {
 			
 			// Send data
 			String msg = wrapData(OldCandleType, sequence.incrementAndGet(), arr);
-			sendChannelData(c, msg);	
+			sendChannelData(c, msg);
+
+			// log
+			LOG.info("Sent candles," + inst + "(" + p + "m, " + candles.size() + ")" + " to " + c);
 		}
 		
 		// Send market data
@@ -308,6 +311,9 @@ public class HQSubscribers {
 			// Get JSON string
 			String msg = wrapData(OldMarketDataType, sequence.incrementAndGet(), arr);
 			sendChannelData(c, msg);
+
+			// log
+			LOG.info("Sent mds," + inst + "(" + l.size() + ")" + " to " + c);
 		}
 	}
 	
