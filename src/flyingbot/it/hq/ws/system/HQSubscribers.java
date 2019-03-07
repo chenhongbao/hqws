@@ -231,6 +231,7 @@ public class HQSubscribers {
 
     protected void sendChannelData(Channel c, String msg) {
         try {
+            // Can't use await because sending and waiting is in the same thread
             c.writeAndFlush(new TextWebSocketFrame(msg));
         } catch (Exception e) {
             LOG.warning("Sending data failed, " + c + ", " + e.getMessage());
@@ -286,6 +287,7 @@ public class HQSubscribers {
 
         // Write data to group
         try {
+            // Can't use await because sending and waiting is in the same thread
             g.writeAndFlush(new TextWebSocketFrame(msg));
 
         } catch (Exception e) {
@@ -307,6 +309,7 @@ public class HQSubscribers {
             }
 
             try {
+                // Can't use await because sending and waiting is in the same thread
                 g.writeAndFlush(new TextWebSocketFrame(HQSubscribers.HeartbeatMsg));
             } catch (Exception e) {
                 res = new Result(Result.Error, -1, "Sending heartbeat failed, " + e.getMessage());
