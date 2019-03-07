@@ -8,11 +8,48 @@ import org.json.JSONObject;
 
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Logger;
 
 public class HQDataKeeper {
+
+    public static long reconnectMillis = 1000 * 60 * 60;
+
+    // Load info from JSON config
+    String URL, userName, password, connStr;
+
+    // Database connection and statement
+    Connection connDB = null;
+    PreparedStatement statementDB = null;
+
+    // Logger instance
+    Logger LOG = null;
+
+    // lock
+    ReadWriteLock lock;
+
+    // Candle cache
+    Map<String, InstCandlePack> instPacks;
+
+    // Timestamp for last access DB
+    long _LastAccessDB = 0;
+    static String querySql = "SELECT `JSON` FROM `candledb`.`candle_01` "
+            + "WHERE `InstrumentID` = ? AND `Period` = ? "
+            + "ORDER BY `SerialNo` DESC";
+
+    public HQDataKeeper(Logger Log) {
+        LOG = Log;
+        lock = new ReentrantReadWriteLock();
+        instPacks = new HashMap<String, InstCandlePack>();
+        try {
+            loadConfiguration();
+        } catch (Exception e) {
+            LOG.severe("Loading configuration failed, " + e.getMessage());
+        }
+    }
 
 	public List<Candle> getCandles(String InstrumentID, int Period, int ReversedNumber) {
 		InstCandlePack icp = null;
@@ -43,7 +80,7 @@ public class HQDataKeeper {
 			return lst;
 		} else {
 			// Not enough data and hasn't fetched DB, query from DB
-			if (!icp.hasFetchedDB()) {
+            if (!icp.hasFetchedDB(Period)) {
 				lst = loadCandleFromDB(InstrumentID, Period, ReversedNumber);
 
 				if (lst != null) {
@@ -60,45 +97,10 @@ public class HQDataKeeper {
 				lst = icp.queryCandle(Period, ReversedNumber);
 
 				// set mark
-				icp.hasFetchedDB(true);
+                icp.hasFetchedDB(Period, true);
 			}
 
 			return lst;
-		}
-	}
-
-	// Load info from JSON config
-	String URL, userName, password, connStr;
-
-	// Database connection and statement
-	Connection connDB = null;
-	PreparedStatement statementDB = null;
-
-	// Logger instance
-	Logger LOG = null;
-
-	// lock
-	ReadWriteLock lock;
-
-	// Candle cache
-	Map<String, InstCandlePack> instPacks;
-
-	// Timestamp for last access DB
-	long _LastAccessDB = 0;
-	public static long _ReconnectMillis = 1000 * 60 * 60;
-
-	static String _QuerySql = "SELECT `JSON` FROM `candledb`.`candle_01` "
-			+ "WHERE `InstrumentID` = ? AND `Period` = ? "
-			+ "ORDER BY `SerialNo` DESC LIMIT ?";
-
-	public HQDataKeeper(Logger Log) {
-		LOG = Log;
-		lock = new ReentrantReadWriteLock();
-		instPacks = new HashMap<String, InstCandlePack>();
-		try {
-			loadConfiguration();
-		} catch (Exception e) {
-			LOG.severe("�������������ݿ����ô���" + e.getMessage());
 		}
 	}
 
@@ -156,11 +158,10 @@ public class HQDataKeeper {
 			// Set params
 			statementDB.setString(1, InstrumentID);
 			statementDB.setInt(2, Period);
-			statementDB.setInt(3, ReversedNumber);
 
 			// log start
 			LOG.info("Start loading candles from DB, " + InstrumentID
-					+ ", period: " + Period + "m, total: " + ReversedNumber);
+                    + ", period: " + Period + "m, wanted: " + ReversedNumber);
 
 			ResultSet rs = statementDB.executeQuery();
 
@@ -176,7 +177,7 @@ public class HQDataKeeper {
 			_LastAccessDB = System.currentTimeMillis();
 
 			// log end
-			LOG.info("Loaded candles " + InstrumentID + ", PERIOD: " + Period + "m, TOTAL: " + ReversedNumber);
+            LOG.info("Loaded candles " + InstrumentID + ", PERIOD: " + Period + "m, found: " + lst.size());
 		} catch (SQLException e) {
 			LOG.severe("Query candles from DB failed, " + InstrumentID + ", PERIOD: " + Period + "m, " + e.getMessage());
 		} catch (JSONException e) {
@@ -220,7 +221,47 @@ public class HQDataKeeper {
 		// Update market data
 		icp.insertMarketData(Md);
 	}
-	
+
+    private void connectDatabase() throws SQLException {
+        // Check if we need re-connect
+        long cur = System.currentTimeMillis();
+        if (cur - _LastAccessDB > HQDataKeeper.reconnectMillis) {
+            resetDatabase();
+            _LastAccessDB = cur;
+            return;
+        }
+    }
+
+    private void loadConfiguration() throws Exception {
+        JSONObject obj = Common.LoadJSONObject(this.getClass().getResourceAsStream("candledb_addr.json"));
+        if (obj.has("URL") && obj.has("Username") && obj.has("Password")) {
+            URL = obj.getString("URL");
+            userName = obj.getString("Username");
+            password = obj.getString("Password");
+            connStr = URL
+                    + "?characterEncoding=utf8&useSSL=false"
+                    + "&serverTimezone=UTC&rewriteBatchedStatements=true";
+        }
+        Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
+    }
+
+    private void initDatabase() throws SQLException {
+        connDB = DriverManager.getConnection(connStr, userName, password);
+        statementDB = connDB.prepareStatement(querySql);
+    }
+
+    private void resetDatabase() throws SQLException {
+        if (connDB == null || connDB.isClosed()) {
+            initDatabase();
+            return;
+        }
+        if (statementDB != null && !statementDB.isClosed()) {
+            statementDB.close();
+        }
+        connDB.close();
+        initDatabase();
+    }
+
 	class InstCandlePack {
 
 		// Default cached market data number
@@ -230,7 +271,7 @@ public class HQDataKeeper {
 		// so client will receive older data earlier than newer.
 		//
 		// Candle cache, key: period in minutes, value: candle list
-		HashMap<Integer, LinkedList<Candle>> candles;
+        HashMap<Integer, ConcurrentSkipListSet<Candle>> candles;
 
 		// Market data cache
 		LinkedList<MarketData> mds;
@@ -239,36 +280,37 @@ public class HQDataKeeper {
 		ReadWriteLock wrLock, wrLock0;
 
 		// has been updated from db
-		boolean hasFetchedDB;
+        ConcurrentHashMap<Integer, Boolean> hasFetchedDB;
 
 		public InstCandlePack() {
 			wrLock = new ReentrantReadWriteLock();
 			wrLock0 = new ReentrantReadWriteLock();
 
-			// hasn't fetched data from DB
-			this.hasFetchedDB = false;
-
 			// container
 			mds = new LinkedList<MarketData>();
-			candles = new HashMap<Integer, LinkedList<Candle>>();
+            candles = new HashMap<Integer, ConcurrentSkipListSet<Candle>>();
+
+            // hasn't fetched data from DB
+            this.hasFetchedDB = new ConcurrentHashMap<Integer, Boolean>();
 		}
 
 		/**
 		 * Query candles. Return all candles if available candles are less than those requested.
+         * Older data to left, newer to right.
 		 * @param period Period in minutes
 		 * @param reversedNumber Number of candles return
 		 * @return Candle list
 		 */
 		public List<Candle> queryCandle(int period, int reversedNumber) {
 			// Always return an instance, prohibit null exception
-			List<Candle> ret = new LinkedList<Candle>();
+            LinkedList<Candle> ret = new LinkedList<Candle>();
 
 			// Sync
 			wrLock.readLock().lock();
 
 			// Get candles in the period
 			if (candles.containsKey(period)) {
-				LinkedList<Candle> lst = candles.get(period);
+                ConcurrentSkipListSet<Candle> lst = candles.get(period);
 				if (lst.size() < 1) {
 					wrLock.readLock().unlock();
 					return ret;
@@ -277,8 +319,11 @@ public class HQDataKeeper {
 				// Calculate the number of candles return
 				int len = Math.min(lst.size(), reversedNumber);
 
-				// subList([inclusive], [exclusive])
-				ret.addAll(candles.get(period).subList(lst.size() - len, lst.size()));
+                // sub_set([inclusive], [exclusive])
+                Iterator<Candle> desc_iter = lst.descendingIterator();
+                while (--len >= 0 && desc_iter.hasNext()) {
+                    ret.addFirst(desc_iter.next());
+                }
 			}
 
 			// unlock
@@ -286,12 +331,12 @@ public class HQDataKeeper {
 			return ret;
 		}
 
-		public void hasFetchedDB(boolean h) {
-			this.hasFetchedDB = h;
+        public void hasFetchedDB(int period, boolean h) {
+            this.hasFetchedDB.put(period, h);
 		}
 
-		public boolean hasFetchedDB() {
-			return this.hasFetchedDB;
+        public boolean hasFetchedDB(int period) {
+            return this.hasFetchedDB.containsKey(period) && this.hasFetchedDB.get(period);
 		}
 
 		public void insertCandle(Candle Cnd) {
@@ -300,38 +345,13 @@ public class HQDataKeeper {
 
 			// Create candle list if not exists
 			if (!candles.containsKey(Cnd.Period)) {
-				candles.put(Cnd.Period, new LinkedList<Candle>());
+                candles.put(Cnd.Period, new ConcurrentSkipListSet<Candle>());
 			}
 
-			// Mark if candle has been inserted before the last
-			boolean inserted = false;
+            // Insert candles to sorted set
+            // The candle provides comparable interface that put older data to left and newer to right.
+            candles.get(Cnd.Period).add(Cnd);
 
-			// Insert candles, assuming they have been sorted.
-			LinkedList<Candle> lst = candles.get(Cnd.Period);
-			if (lst.size() < 1) {
-				lst.add(Cnd);
-				wrLock.writeLock().unlock();
-				return;
-			}
-			for (int i = lst.size() - 1; i >= 0; --i) {
-				if (Cnd.SerialNo.compareTo(lst.get(i).SerialNo) == 0) {
-					// Repeated candle
-					wrLock.writeLock().unlock();
-					return;
-				}
-
-				// Newer to the right, older to the left
-				if (Cnd.SerialNo.compareTo(lst.get(i).SerialNo) > 0) {
-					lst.add(i + 1, Cnd);
-					inserted = true;
-					break;
-				}
-			}
-
-			// Candle not inserted, append it to the front
-			if (!inserted) {
-				lst.addFirst(Cnd);
-			}
 			wrLock.writeLock().unlock();
 		}
 
@@ -368,46 +388,5 @@ public class HQDataKeeper {
 			ret.addAll(candles.keySet());
 			return ret;
 		}
-	}
-	
-	private void loadConfiguration() throws Exception {
-		JSONObject obj = Common.LoadJSONObject(this.getClass().getResourceAsStream("candledb_addr.json"));
-		if (obj.has("URL") && obj.has("Username") && obj.has("Password")) {
-			URL = obj.getString("URL");
-			userName = obj.getString("Username");
-			password = obj.getString("Password");
-			connStr = URL
-					+ "?characterEncoding=utf8&useSSL=false"
-					+ "&serverTimezone=UTC&rewriteBatchedStatements=true";
-		}
-		Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
-	}
-
-	private void connectDatabase() throws SQLException {
-		// Check if we need re-connect
-		long cur = System.currentTimeMillis();
-		if (cur - _LastAccessDB > HQDataKeeper._ReconnectMillis) {
-			resetDatabase();
-			_LastAccessDB = cur;
-			return;
-		}
-	}
-	
-	private void resetDatabase() throws SQLException {
-		if (connDB == null || connDB.isClosed()) {
-			initDatabase();
-			return;
-		}
-		if (statementDB != null && !statementDB.isClosed())
-		{
-			statementDB.close();
-		}
-		connDB.close();
-		initDatabase();
-	}
-
-	private void initDatabase() throws SQLException {
-		connDB = DriverManager.getConnection(connStr, userName, password);
-		statementDB = connDB.prepareStatement(_QuerySql);
 	}
 }
