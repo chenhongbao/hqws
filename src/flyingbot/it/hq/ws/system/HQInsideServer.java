@@ -151,7 +151,7 @@ public class HQInsideServer implements Runnable {
 
 				InputStream is = this.getClass().getResourceAsStream("ip.json");
 				if (!Common.VerifyIP(remoteIP, is)) {
-					svrCtx.LOG.warning("Refuse connectino from " + remoteIP);
+                    svrCtx.LOG.warning("Declined connection from " + remoteIP);
 					s.close();
 					continue;
 				}
