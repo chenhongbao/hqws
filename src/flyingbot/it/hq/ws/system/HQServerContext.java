@@ -6,6 +6,9 @@ import io.netty.channel.Channel;
 import org.json.JSONObject;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Logger;
 
@@ -13,27 +16,49 @@ public class HQServerContext {
 	// URI
 	public static String wsURI = "/hqws";
 	public static String subProtocol = "flyingbot_hq_json_ws";
+
+	// URI key
+	public static String URIKey = "client.ws.URI";
 	
 	// Logger instance
 	public Logger LOG;
 	
 	// Marketdata
 	public HQSubscribers subcribers;
+	protected HashMap<Channel, ChannelParameterBundle> channelParams;
 	
 	// Channel parameters
 	protected ReentrantReadWriteLock cpLock;
-	protected HashMap<Channel, Object> channelParams;
-	
 	public HQServerContext() {
 		// Initialize logger
 		initLogger();
-		
+
 		// Channel parameters
-		cpLock = new ReentrantReadWriteLock(); 
-		channelParams = new HashMap<Channel, Object>();
-		
+		cpLock = new ReentrantReadWriteLock();
+		channelParams = new HashMap<>();
+
 		// Create marketdata
 		subcribers = new HQSubscribers(LOG);
+	}
+
+	/**
+	 * Set mapped object for the specific Channel.
+	 *
+	 * @param c     Channel
+	 * @param key   key
+	 * @param value Value
+	 */
+	public void channelParameter(Channel c, String key, String value) {
+		cpLock.writeLock().lock();
+
+		if (!channelParams.containsKey(c)) {
+			channelParams.put(c, new ChannelParameterBundle());
+		}
+
+		// Add parameter
+		channelParams.get(c).parameter(key, value);
+
+		cpLock.writeLock().unlock();
 	}
 	
 	private void initLogger() {	
@@ -56,37 +81,152 @@ public class HQServerContext {
 	}
 	
 	/**
-	 * Set mapped object for the specific Channel.
-	 * @param c Channel
-	 * @param v Value, an Object instance
-	 */
-	public void setChannelParameter(Channel c, Object v) {
-		cpLock.writeLock().lock();
-		channelParams.put(c, v);
-		cpLock.writeLock().unlock();
-	}
-	
-	/**
 	 * Get the mapped object for the specific {@link Channel}.
 	 * @param c Channel having the object.
 	 * @return object mapped for the channel, or null if no object found.
 	 */
-	public Object getChannelParameter(Channel c) {
+	public String channelParameter(Channel c, String key) {
+		String ret = null;
 		cpLock.readLock().lock();
-		Object ret = channelParams.get(c);
+
+		if (channelParams.containsKey(c)) {
+			ret = channelParams.get(c).parameter(key);
+		}
+
 		cpLock.readLock().unlock();
 		return ret;
 	}
-
+	
 	/**
 	 * Remove object mapped to the Channel.
 	 * @param c Channel that owns the object.
 	 * @return true on success, false if no object associated with the key.
 	 */
-	public boolean removeChannelParameter(Channel c) {
+	public boolean removeChannel(Channel c) {
 		cpLock.writeLock().lock();
 		Object ret = channelParams.remove(c);
 		cpLock.writeLock().unlock();
 		return ret != null;
+	}
+
+	/**
+	 * Remove key-value pair on channel.
+	 *
+	 * @param c   channel
+	 * @param key key
+	 * @return true if success
+	 */
+	public boolean removeParameter(Channel c, String key) {
+		String ret = null;
+		cpLock.writeLock().lock();
+
+		if (channelParams.containsKey(c)) {
+			ret = channelParams.get(c).removeParameter(key);
+		}
+
+		cpLock.writeLock().unlock();
+		return ret != null;
+	}
+
+	/**
+	 * Add subscribed isntrument record.
+	 *
+	 * @param c    channel
+	 * @param inst instrument
+	 */
+	public void addInstrument(Channel c, String inst) {
+		cpLock.writeLock().lock();
+
+		if (!channelParams.containsKey(c)) {
+			channelParams.put(c, new ChannelParameterBundle());
+		}
+
+		// Add instrument
+		channelParams.get(c).instrument(inst);
+
+		cpLock.writeLock().unlock();
+	}
+
+	/**
+	 * Remove instrument subscription record.
+	 *
+	 * @param c    channel
+	 * @param inst instrument
+	 * @return true if success
+	 */
+	public boolean removeInstrument(Channel c, String inst) {
+		boolean ret = false;
+		cpLock.writeLock().lock();
+
+		if (channelParams.containsKey(c)) {
+			ret = channelParams.get(c).removeInstrument(inst);
+		}
+
+		cpLock.writeLock().unlock();
+		return ret;
+	}
+
+	/**
+	 * Test if instrument has been subscribed
+	 *
+	 * @param c    channel
+	 * @param inst instrument
+	 * @return true if given instrument is subscribed
+	 */
+	public boolean isSubscribed(Channel c, String inst) {
+		boolean ret = false;
+		cpLock.writeLock().lock();
+
+		if (channelParams.containsKey(c)) {
+			ret = channelParams.get(c).instruments().contains(inst);
+		}
+
+		cpLock.writeLock().unlock();
+		return ret;
+	}
+
+	public static class ChannelParameterBundle {
+		/**
+		 * Hash map for parameters
+		 */
+		HashMap<String, String> params;
+
+		/**
+		 * Subscribed instruments
+		 */
+		HashSet<String> subs;
+
+		public ChannelParameterBundle() {
+			params = new HashMap<String, String>();
+			subs = new HashSet<String>();
+		}
+
+		public void parameter(String key, String value) {
+			params.put(key, value);
+		}
+
+		public String parameter(String key) {
+			return params.get(key);
+		}
+
+		public String removeParameter(String key) {
+			return params.remove(key);
+		}
+
+		public Map<String, String> parameters() {
+			return params;
+		}
+
+		public void instrument(String inst) {
+			subs.add(inst);
+		}
+
+		public boolean removeInstrument(String inst) {
+			return subs.remove(inst);
+		}
+
+		public Set<String> instruments() {
+			return subs;
+		}
 	}
 } 

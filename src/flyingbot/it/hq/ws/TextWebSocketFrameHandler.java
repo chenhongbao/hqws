@@ -8,17 +8,18 @@ import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static flyingbot.it.hq.ws.system.HQServerContext.URIKey;
+
 /**
- * WebSocket subprotocol is defined in {@link HQServerContext.subProtocol}, make
+ * WebSocket subprotocol is defined in {@link HQServerContext}.subprotocol, make
  * sure they are matched.
  * 
  * Two ways to subscribe an instrument,
  * <li>URI path mapping, ws://localhost:8080/(service-path)/(instrument).
- * Service path is defined in {@link HQServerContext.wsURI}.
+ * Service path is defined in {@link HQServerContext}.wsURI.
  * <li>Send un/subscription JSON data.
  * 
  * JSON un/subscription format,
@@ -45,9 +46,6 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 	// InstrumentID regex
 	Pattern patt;
 
-	// Subscription record
-	HashSet<String> subs;
-
 	// JSON request types
 	public final static String DataType_Sub = "Subscription";
 	public final static String DataType_Uns = "Unsubscription";
@@ -55,13 +53,15 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 	// URL parameter
 	public final static String candleNum = "candlenumber";
 
+    // Null subscription
+    public final static String NullInstrument = "x0";
+
 	// Default initial sent history candles
 	public final static int DefaultInitCandleNumber = 360;
 	int numberCandle = DefaultInitCandleNumber;
 
 	public TextWebSocketFrameHandler(HQServerContext ctx) {
 		this.svrCtx = ctx;
-		this.subs = new HashSet<String>();
 		this.patt = Pattern.compile("[a-zA-Z]+[0-9]+");
 	}
 
@@ -74,8 +74,7 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 			ctx.pipeline().remove(HttpRequestHandler.class);
 
 			// Process subscription
-			String path = (String) svrCtx.getChannelParameter(ctx.channel());
-			svrCtx.removeChannelParameter(ctx.channel());
+            String path = svrCtx.channelParameter(ctx.channel(), URIKey);
 
 			// Parse instrument id and candle number
 			if (path.indexOf('?') != -1) {
@@ -93,19 +92,11 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 			Matcher m = patt.matcher(rawInst);
 			if (m.find()) {
 				String inst = rawInst.substring(m.start());
-				if (subs.contains(inst)) {
-					svrCtx.LOG.warning("Client subscribe duplicated instrument, " + inst);
-				} else {
-					// Subscribe
-					subs.add(inst);
-					svrCtx.subcribers.subscribe(inst, ctx.channel());
 
-					// Send initial history data
-					svrCtx.subcribers.sendHistoryData(inst, ctx.channel(), numberCandle);
-					
-					// Log info
-					svrCtx.LOG.info("Client joins subscription pool, " + inst + ", " + ctx.channel());
-				}
+                // Null instrument, keep connection open without actual subscription
+                if (inst.compareTo(NullInstrument) != 0) {
+                    subscribeInstrument(ctx, inst);
+                }
 			} else {
 				// Wrong input from client
 				svrCtx.LOG.warning("Client subscribe invalid instrument, PATH: " + path);
@@ -115,6 +106,32 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 			super.userEventTriggered(ctx, evt);
 		}
 	}
+
+    protected void subscribeInstrument(ChannelHandlerContext ctx, String inst) {
+        if (svrCtx.isSubscribed(ctx.channel(), inst)) {
+            // Duplicated subscription
+            svrCtx.LOG.warning("Client subscribe duplicated instrument, " + inst);
+        } else {
+            // Subscribe
+            svrCtx.addInstrument(ctx.channel(), inst);
+            svrCtx.subcribers.subscribe(inst, ctx.channel());
+
+            // Send initial history data
+            svrCtx.subcribers.sendHistoryData(inst, ctx.channel(), numberCandle);
+
+            // Log info
+            svrCtx.LOG.info("Client joins subscription pool, " + inst + ", " + ctx.channel());
+        }
+    }
+
+    protected void unsubscribeInstrument(ChannelHandlerContext ctx, String inst) {
+        // Unsubscribe
+        svrCtx.subcribers.unSubscribe(inst, ctx.channel());
+        svrCtx.removeInstrument(ctx.channel(), inst);
+
+        // Log info
+        svrCtx.LOG.info("Remove client from subscription pool, " + inst + ", " + ctx.channel());
+    }
 
 	protected String getURLValue(String key, String url) {
 		int p = url.indexOf(key + "=");
@@ -152,19 +169,9 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 			for (int i = 0; i < arr.length(); ++i) {
 				String inst = arr.getString(i);
 				if (o.getString("type").compareTo(DataType_Sub) == 0) {
-					// Duplicated subscription
-					if (subs.contains(inst)) {
-						svrCtx.LOG.warning("Client subscribe duplicated instrument, " + inst);
-					} else {
-						// Subscribe
-						svrCtx.subcribers.subscribe(inst, ctx.channel());
-
-						// Send initial history data
-						svrCtx.subcribers.sendHistoryData(inst, ctx.channel(), numberCandle);
-					}
+                    subscribeInstrument(ctx, inst);
 				} else {
-					// Unsubscribe
-					svrCtx.subcribers.unSubscribe(inst, ctx.channel());
+                    unsubscribeInstrument(ctx, inst);
 				}
 			}
 		} catch (Exception e) {
@@ -179,8 +186,8 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-		// Remove parameter
-		svrCtx.removeChannelParameter(ctx.channel());
+        // Remove bundle
+        svrCtx.removeChannel(ctx.channel());
 
 		// Don't need to un-subscribe instruments when Channel is closed.
 		// The ChannelGroup will manage the closed channels.
