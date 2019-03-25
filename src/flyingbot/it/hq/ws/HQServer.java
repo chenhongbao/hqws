@@ -1,5 +1,6 @@
 package flyingbot.it.hq.ws;
 
+import flyingbot.it.hq.ws.resources.Constants;
 import flyingbot.it.hq.ws.system.HQInsideServer;
 import flyingbot.it.hq.ws.system.HQServerContext;
 import flyingbot.it.util.Common;
@@ -16,35 +17,19 @@ import org.json.JSONObject;
 
 import java.net.InetSocketAddress;
 
-public class HQServer {
-	
-	public static class ChatServerInitializer extends ChannelInitializer<Channel> {
-	
-		// Server context
-		private HQServerContext svrCtx;
-		
-		public ChatServerInitializer(HQServerContext ctx) {
-			this.svrCtx = ctx;
-		}
+import static flyingbot.it.hq.ws.resources.Constants.*;
 
-		@Override
-		protected void initChannel(Channel ch) throws Exception {
-			ChannelPipeline pipeline = ch.pipeline();
-			
-			// Add listener and handlers
-			pipeline.addLast(new HttpServerCodec());
-			pipeline.addLast(new ChunkedWriteHandler());
-			pipeline.addLast(new HttpObjectAggregator(64 *1024));
-			pipeline.addLast(new HttpRequestHandler(svrCtx));
-			
-			// After update to WebSocket protocol, the handler will replace HttpRequestDecoder
-			// with WebSocketFrameDecoder, and HttpResponseEncoder with WebSocketFrameEncoder, and
-			// any other ChannelHandler that are not used any more.
-			pipeline.addLast(new WebSocketServerProtocolHandler(HQServerContext.wsURI, HQServerContext.subProtocol));
-			
-			pipeline.addLast(new TextWebSocketFrameHandler(svrCtx));
+public class HQServer {
+
+	protected static int getListenPort() {
+		// Load JSON as stream
+		JSONObject o = Common.LoadJSONObject(Constants.class.getResourceAsStream("port.json"));
+		if (!o.has(ConfigTag_Port)) {
+			serverCtx.LOG.warning("Reading listening port JSON failed, listen on DEFAULT port: " + DefaultListenPort);
+			return DefaultListenPort;
+		} else {
+			return o.getInt(ConfigTag_Port);
 		}
-		
 	}
 	
 	// For short request like WebSocket, Old IO is more efficient.
@@ -52,10 +37,7 @@ public class HQServer {
 	
 	// Channel
 	private Channel channel;
-	
-	// Default listening port
-	private final static int DefaultListenPort = 9101;
-	
+
 	// Logger
 	private static HQServerContext serverCtx;
 	
@@ -87,7 +69,7 @@ public class HQServer {
 				while (true) {
 					try {
 						// prime number
-						Thread.sleep(17 * 1000);
+						Thread.sleep(WsHeartbeat_Intvl);
 					} catch (InterruptedException e) {
 					}
 					
@@ -114,27 +96,34 @@ public class HQServer {
 		serverCtx.subcribers.closeAll();
 		group.shutdownGracefully();
 	}
-	
-	protected static int getListenPort() {
-		// Get Class path
-		StackTraceElement[] traces = Thread.currentThread().getStackTrace();
-		Class<?> clz = null;
-		try {
-			clz = Class.forName(traces[1].getClassName());
-		} catch (ClassNotFoundException e) {
-			Common.PrintException(e);
-			return DefaultListenPort;
+
+	public static class ChatServerInitializer extends ChannelInitializer<Channel> {
+
+		// Server context
+		private HQServerContext svrCtx;
+
+		public ChatServerInitializer(HQServerContext ctx) {
+			this.svrCtx = ctx;
 		}
-		
-		// Load JSON as stream
-		JSONObject o = Common.LoadJSONObject(clz.getResourceAsStream("port.json"));
-		if (!o.has("Port")) {
-			serverCtx.LOG.warning("Reading listening port JSON failed, listen on DEFAULT port: " + DefaultListenPort);
-			return DefaultListenPort;
+
+		@Override
+		protected void initChannel(Channel ch) throws Exception {
+			ChannelPipeline pipeline = ch.pipeline();
+
+			// Add listener and handlers
+			pipeline.addLast(new HttpServerCodec());
+			pipeline.addLast(new ChunkedWriteHandler());
+			pipeline.addLast(new HttpObjectAggregator(HTTP_MaxContentLength));
+			pipeline.addLast(new HttpRequestHandler(svrCtx));
+
+			// After update to WebSocket protocol, the handler will replace HttpRequestDecoder
+			// with WebSocketFrameDecoder, and HttpResponseEncoder with WebSocketFrameEncoder, and
+			// any other ChannelHandler that are not used any more.
+			pipeline.addLast(new WebSocketServerProtocolHandler(wsURI, subProtocol));
+
+			pipeline.addLast(new TextWebSocketFrameHandler(svrCtx));
 		}
-		else {
-			return o.getInt("Port");
-		}
+
 	}
 	
 	public static void main(String[] args) {

@@ -18,21 +18,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Logger;
 
-public class HQSubscribers {
+import static flyingbot.it.hq.ws.resources.Constants.*;
 
-    // JSON format constant
-    public final static String DataTag = "data";
-    public final static String TypeTag = "type";
-    public final static String SequenceTag = "sequence";
-    // JSON type field, marking the data is historical
-    public final static String OldCandleType = "OldCandle";
-    public final static String OldMarketDataType = "OldMarketData";
-    // Send timeout
-    public final static int SendTimeoutMillis = 5000;
-    // LRU size
-    public final static int LRUSize = 50;
-    // Heartbeat message
-    public final static String HeartbeatMsg = "{\"sequence\":0,\"type\":\"Heartbeat\",\"data\":[]}";
+public class HQSubscribers {
     // Market data keeper
     public HQDataKeeper dataKeeper;
     // Subscription group
@@ -135,6 +123,9 @@ public class HQSubscribers {
         if (lru.contains(d.InstrumentID)) {
             dataKeeper.onMarketData(d);
         }
+
+        // Update dominant instrument
+        dataKeeper.updateDominantInstrument(d);
         return r;
     }
 
@@ -162,23 +153,23 @@ public class HQSubscribers {
                 int num = number;
 
                 // 240 days a year
-                if (p == 1440 && number > 240) {
-                    num = 240;
+                if (p == Candle_1440m && number > Candle1440_MaxNum) {
+                    num = Candle1440_MaxNum;
                 }
 
-                // 6 housr each day
-                if (p == 60 && number > 1440) {
-                    num = 1440;
+                // 6 hours each day
+                if (p == Candle_60m && number > Candle60_MaxNum) {
+                    num = Candle60_MaxNum;
                 }
 
                 // 4 quarters each hour
-                if (p == 15 && number > 5760) {
-                    num = 5760;
+                if (p == Candle_15m && number > Candle15_MaxNum) {
+                    num = Candle15_MaxNum;
                 }
 
                 // 3 5-minutes each quarter
-                if (p == 5 && number > 17280) {
-                    num = 17280;
+                if (p == Candle_5m && number > Candle5_MaxNum) {
+                    num = Candle5_MaxNum;
                 }
 
                 // Query candles
@@ -206,7 +197,7 @@ public class HQSubscribers {
             }
 
             // Send market data
-            List<MarketData> l = dataKeeper.queryMarketData(inst, 10);
+            List<MarketData> l = dataKeeper.queryMarketData(inst, MarketDataToClient_Num);
             if (l.size() > 0) {
                 // Prepare JSON
                 JSONObject[] arr = new JSONObject[l.size()];
@@ -226,6 +217,45 @@ public class HQSubscribers {
             // log exception
             LOG.severe(e.getMessage());
             Common.PrintException(e);
+        }
+    }
+
+    /**
+     * Send dominant instrument id.
+     * reponse format:
+     * {
+     * "ProductID" : "c",
+     * "InstrumentID" : "c1909"
+     * }
+     * <p>
+     * type: DominantInstrument
+     *
+     * @param pid product id
+     * @param ch  channel
+     * @return dominant instrument id for the product
+     */
+    public String sendDominantInstrument(String pid, Channel ch) {
+        String inst = dataKeeper.getDominantInstrument(pid);
+        if (inst == null) {
+            inst = "";
+        }
+
+        // Create object
+        JSONObject[] arr = new JSONObject[1];
+        arr[0] = new JSONObject();
+        arr[0].put(PidTag, pid);
+        arr[0].put(InstrumentIDTag, inst);
+
+        try {
+            // Generate JSON
+            String msg = wrapData(DominantInstrumentType, sequence.incrementAndGet(), arr);
+            sendChannelData(ch, msg);
+        } catch (Exception e) {
+            // log exception
+            LOG.severe(e.getMessage());
+            Common.PrintException(e);
+        } finally {
+            return inst;
         }
     }
 
@@ -310,7 +340,7 @@ public class HQSubscribers {
 
             try {
                 // Can't use await because sending and waiting is in the same thread
-                g.writeAndFlush(new TextWebSocketFrame(HQSubscribers.HeartbeatMsg));
+                g.writeAndFlush(new TextWebSocketFrame(HeartbeatMsg));
             } catch (Exception e) {
                 res = new Result(Result.Error, -1, "Sending heartbeat failed, " + e.getMessage());
                 break;

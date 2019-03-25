@@ -6,7 +6,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpRequest;
 
-import static flyingbot.it.hq.ws.system.HQServerContext.URIKey;
+import static flyingbot.it.hq.ws.resources.Constants.URIKey;
+import static flyingbot.it.hq.ws.resources.Constants.wsURI;
 
 public class HttpRequestHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 	// Server context
@@ -23,13 +24,13 @@ public class HttpRequestHandler extends SimpleChannelInboundHandler<FullHttpRequ
 		svrCtx.LOG.info("Client connected, " + ctx.channel() + ", URI: " + reqUri);
 		
 		// Check if client requests the right resource
-		if (reqUri.startsWith(HQServerContext.wsURI)) {
+		if (reqUri.startsWith(wsURI)) {
 			// Set path parameter
-			String param = reqUri.substring(HQServerContext.wsURI.length());
+			String param = reqUri.substring(wsURI.length());
             svrCtx.channelParameter(ctx.channel(), URIKey, param);
 			
 			// Reset URI for WebSocketProtocolHandler, or it will block the request
-			request.setUri(HQServerContext.wsURI);
+			request.setUri(wsURI);
 			
 			// Fire next handler
 			ctx.fireChannelRead(request.retain());

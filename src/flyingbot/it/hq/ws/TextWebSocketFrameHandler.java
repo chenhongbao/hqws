@@ -11,7 +11,7 @@ import org.json.JSONObject;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static flyingbot.it.hq.ws.system.HQServerContext.URIKey;
+import static flyingbot.it.hq.ws.resources.Constants.*;
 
 /**
  * WebSocket subprotocol is defined in {@link HQServerContext}.subprotocol, make
@@ -46,18 +46,6 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 	// InstrumentID regex
 	Pattern patt;
 
-	// JSON request types
-	public final static String DataType_Sub = "Subscription";
-	public final static String DataType_Uns = "Unsubscription";
-
-	// URL parameter
-	public final static String candleNum = "candlenumber";
-
-    // Null subscription
-    public final static String NullInstrument = "x0";
-
-	// Default initial sent history candles
-	public final static int DefaultInitCandleNumber = 360;
 	int numberCandle = DefaultInitCandleNumber;
 
 	public TextWebSocketFrameHandler(HQServerContext ctx) {
@@ -133,6 +121,13 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
         svrCtx.LOG.info("Remove client from subscription pool, " + inst + ", " + ctx.channel());
     }
 
+	protected void sendDominantInstrument(ChannelHandlerContext ctx, String pid) {
+		String inst = svrCtx.subcribers.sendDominantInstrument(pid, ctx.channel());
+
+		// Log info
+		svrCtx.LOG.info("Find dominate instrument, " + pid + "->" + inst + ", " + ctx.channel());
+	}
+
 	protected String getURLValue(String key, String url) {
 		int p = url.indexOf(key + "=");
 		if (p == -1) {
@@ -152,26 +147,24 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 			String text = msg.text();
 			JSONObject o = new JSONObject(text);
 
-			// Check the type
-			if (o.getString("type").compareTo(DataType_Sub) != 0 && o.getString("type").compareTo(DataType_Uns) != 0) {
-				svrCtx.LOG.warning("JSON request error, type is supposed to be Subscription/Unsubscription, received "
-						+ o.getString("type"));
-				return;
-			}
-
 			// Parse un/subscription
-			JSONArray arr = o.getJSONArray("data");
+			JSONArray arr = o.getJSONArray(DataTag);
 			if (arr.length() < 1) {
 				return;
 			}
-			
-			// Iterate and check if it is not subscribed
+
+			// Try subscription
 			for (int i = 0; i < arr.length(); ++i) {
 				String inst = arr.getString(i);
-				if (o.getString("type").compareTo(DataType_Sub) == 0) {
-                    subscribeInstrument(ctx, inst);
+				if (o.getString(TypeTag).compareTo(DataType_Sub) == 0) {
+					subscribeInstrument(ctx, inst);
+				} else if (o.getString(TypeTag).compareTo(DataType_Uns) == 0) {
+					unsubscribeInstrument(ctx, inst);
+				} else if (o.getString(TypeTag).compareTo(FindDominant) == 0) {
+					sendDominantInstrument(ctx, inst);
 				} else {
-                    unsubscribeInstrument(ctx, inst);
+					svrCtx.LOG.warning("JSON request type error, received "
+							+ o.getString(TypeTag));
 				}
 			}
 		} catch (Exception e) {

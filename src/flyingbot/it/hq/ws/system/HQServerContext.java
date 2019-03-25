@@ -1,6 +1,7 @@
 package flyingbot.it.hq.ws.system;
 
 import flyingbot.it.data.log.SocketLoggerFactory;
+import flyingbot.it.hq.ws.resources.Constants;
 import flyingbot.it.util.Common;
 import io.netty.channel.Channel;
 import org.json.JSONObject;
@@ -12,13 +13,11 @@ import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Logger;
 
-public class HQServerContext {
-	// URI
-	public static String wsURI = "/hqws";
-	public static String subProtocol = "flyingbot_hq_json_ws";
+import static flyingbot.it.hq.ws.resources.Constants.ConfigTag_IP;
+import static flyingbot.it.hq.ws.resources.Constants.ConfigTag_Port;
 
-	// URI key
-	public static String URIKey = "client.ws.URI";
+public class HQServerContext {
+
 	
 	// Logger instance
 	public Logger LOG;
@@ -63,14 +62,14 @@ public class HQServerContext {
 	
 	private void initLogger() {	
 		// Read configuration
-		JSONObject obj = Common.LoadJSONObject(this.getClass().getResourceAsStream("log_addr.json"));
-		if (obj != null && obj.has("IP") && obj.has("Port")) {
+		JSONObject obj = Common.LoadJSONObject(Constants.class.getResourceAsStream("log_addr.json"));
+		if (obj != null && obj.has(ConfigTag_IP) && obj.has(ConfigTag_Port)) {
 			int port = 0;
 			String ip = null;
 			
 			// Get fields
-			ip = obj.getString("IP");
-			port = obj.getInt("Port");
+			ip = obj.getString(ConfigTag_IP);
+			port = obj.getInt(ConfigTag_Port);
 			
 			// Create logger instance
 			LOG = SocketLoggerFactory.GetInstance(this.getClass().getCanonicalName(), ip, port);

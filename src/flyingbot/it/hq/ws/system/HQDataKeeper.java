@@ -2,6 +2,7 @@ package flyingbot.it.hq.ws.system;
 
 import flyingbot.it.data.hq.Candle;
 import flyingbot.it.data.hq.MarketData;
+import flyingbot.it.hq.ws.resources.Constants;
 import flyingbot.it.util.Common;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -13,6 +14,10 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static flyingbot.it.hq.ws.resources.Constants.*;
 
 public class HQDataKeeper {
 
@@ -34,22 +39,19 @@ public class HQDataKeeper {
     // Candle cache
     Map<String, InstCandlePack> instPacks;
 
+	// Find product id from instrument id
+	Pattern patt;
+
     // Timestamp for last access DB
     long _LastAccessDB = 0;
     static String querySql = "SELECT `JSON` FROM `candledb`.`candle_01` "
             + "WHERE `InstrumentID` = ? AND `Period` = ? "
             + "ORDER BY `SerialNo` DESC";
-
-    public HQDataKeeper(Logger Log) {
-        LOG = Log;
-        lock = new ReentrantReadWriteLock();
-        instPacks = new HashMap<String, InstCandlePack>();
-        try {
-            loadConfiguration();
-        } catch (Exception e) {
-            LOG.severe("Loading configuration failed, " + e.getMessage());
-        }
-    }
+	/**
+	 * Dominant instruments.
+	 * ProductID -> InstrumentID
+	 */
+	ConcurrentHashMap<String, String> domiInsts;
 
 	public List<Candle> getCandles(String InstrumentID, int Period, int ReversedNumber) {
 		InstCandlePack icp = null;
@@ -222,6 +224,47 @@ public class HQDataKeeper {
 		icp.insertMarketData(Md);
 	}
 
+	/**
+	 * Open interest for current dominant instruments
+	 */
+	ConcurrentHashMap<String, Double> domiOpenIns;
+
+	public HQDataKeeper(Logger Log) {
+		LOG = Log;
+		lock = new ReentrantReadWriteLock();
+		instPacks = new HashMap<>();
+		domiInsts = new ConcurrentHashMap<>();
+		domiOpenIns = new ConcurrentHashMap<>();
+		patt = Pattern.compile("[0-9]+$");
+		try {
+			loadConfiguration();
+		} catch (Exception e) {
+			LOG.severe("Loading configuration failed, " + e.getMessage());
+		}
+	}
+
+	public void updateDominantInstrument(MarketData md) {
+		Matcher m = patt.matcher(md.InstrumentID);
+		if (!m.matches()) {
+			return;
+		}
+
+		// Find product id
+		String pid = md.InstrumentID.substring(0, m.start());
+		if (!domiInsts.containsKey(pid) || domiOpenIns.get(pid) < md.OpenInterest) {
+			domiInsts.put(pid, md.InstrumentID);
+			domiOpenIns.put(pid, md.OpenInterest);
+		}
+	}
+
+	public String getDominantInstrument(String productID) {
+		if (!domiInsts.containsKey(productID)) {
+			return "";
+		} else {
+			return domiInsts.get(productID);
+		}
+	}
+
     private void connectDatabase() throws SQLException {
         // Check if we need re-connect
         long cur = System.currentTimeMillis();
@@ -233,11 +276,11 @@ public class HQDataKeeper {
     }
 
     private void loadConfiguration() throws Exception {
-        JSONObject obj = Common.LoadJSONObject(this.getClass().getResourceAsStream("candledb_addr.json"));
-        if (obj.has("URL") && obj.has("Username") && obj.has("Password")) {
-            URL = obj.getString("URL");
-            userName = obj.getString("Username");
-            password = obj.getString("Password");
+		JSONObject obj = Common.LoadJSONObject(Constants.class.getResourceAsStream("candledb_addr.json"));
+		if (obj.has(ConfigTag_URL) && obj.has(ConfigTag_User) && obj.has(ConfigTag_Pwd)) {
+			URL = obj.getString(ConfigTag_URL);
+			userName = obj.getString(ConfigTag_User);
+			password = obj.getString(ConfigTag_Pwd);
             connStr = URL
                     + "?characterEncoding=utf8&useSSL=false"
                     + "&serverTimezone=UTC&rewriteBatchedStatements=true";
@@ -263,14 +306,11 @@ public class HQDataKeeper {
     }
 
 	class InstCandlePack {
-
-		// Default cached market data number
-		public static final int DefaultCachedMarketData = 10;
-
-		// Older data to left, newer data to right. Send data client in this order,
-		// so client will receive older data earlier than newer.
-		//
-		// Candle cache, key: period in minutes, value: candle list
+		/*
+		 * Older data to left, newer data to right. Send data client in this order,
+		 * so client will receive older data earlier than newer.
+		 * Candle cache, key: period in minutes, value: candle list
+		 */
         HashMap<Integer, ConcurrentSkipListSet<Candle>> candles;
 
 		// Market data cache
@@ -373,7 +413,7 @@ public class HQDataKeeper {
 				return;
 			}
 			wrLock0.writeLock().lock();
-			while (mds.size() >= DefaultCachedMarketData) {
+			while (mds.size() >= DefaultCachedMarketData_Num) {
 				// FIFO
 				mds.removeFirst();
 			}
