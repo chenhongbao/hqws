@@ -83,7 +83,7 @@ public class HQDataKeeper {
 		} else {
 			// Not enough data and hasn't fetched DB, query from DB
             if (!icp.hasFetchedDB(Period)) {
-				lst = loadCandleFromDB(InstrumentID, Period, ReversedNumber);
+                lst = getCandleFromDB(InstrumentID, Period, ReversedNumber);
 
 				if (lst != null) {
 					// Merge newly queried data into cache
@@ -151,7 +151,13 @@ public class HQDataKeeper {
 		return r;
 	}
 
-	synchronized private List<Candle> loadCandleFromDB(String InstrumentID, int Period, int ReversedNumber) {
+    synchronized private List<Candle> getCandleFromDB(String InstrumentID, int Period, int ReversedNumber) {
+        // TODO Investigate if we can generate 60/1440 candles from 1/5/15 candles.
+        // We can drop the second generator, candle2.exe, due to the above improvement.
+        return loadCandleFromDB(InstrumentID, Period, ReversedNumber);
+    }
+
+    private List<Candle> loadCandleFromDB(String InstrumentID, int Period, int ReversedNumber) {
 		List<Candle> lst = null;
 		try {
 			// Connect database if not connected
