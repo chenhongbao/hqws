@@ -241,7 +241,7 @@ public class HQDataKeeper {
 		instPacks = new HashMap<>();
 		domiInsts = new ConcurrentHashMap<>();
 		domiOpenIns = new ConcurrentHashMap<>();
-		patt = Pattern.compile("[0-9]+$");
+        patt = Pattern.compile("[a-zA-Z]+");
 		try {
 			loadConfiguration();
 		} catch (Exception e) {
@@ -251,12 +251,12 @@ public class HQDataKeeper {
 
 	public void updateDominantInstrument(MarketData md) {
 		Matcher m = patt.matcher(md.InstrumentID);
-		if (!m.matches()) {
+        if (!m.find()) {
 			return;
 		}
 
 		// Find product id
-		String pid = md.InstrumentID.substring(0, m.start());
+        String pid = md.InstrumentID.substring(m.start(), m.end());
 		if (!domiInsts.containsKey(pid) || domiOpenIns.get(pid) < md.OpenInterest) {
 			domiInsts.put(pid, md.InstrumentID);
 			domiOpenIns.put(pid, md.OpenInterest);

@@ -77,9 +77,9 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 			}
 
 			// Test if the path matches instrument id
-			Matcher m = patt.matcher(rawInst);
+            Matcher m = patt.matcher(rawInst.trim());
 			if (m.find()) {
-				String inst = rawInst.substring(m.start());
+                String inst = rawInst.substring(m.start(), m.end());
 
                 // Null instrument, keep connection open without actual subscription
                 if (inst.compareTo(NullInstrument) != 0) {
