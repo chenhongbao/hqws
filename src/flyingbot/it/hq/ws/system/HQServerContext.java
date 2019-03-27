@@ -23,7 +23,7 @@ public class HQServerContext {
 	public Logger LOG;
 	
 	// Marketdata
-	public HQSubscribers subcribers;
+	public HQSubscribers subscribers;
 	protected HashMap<Channel, ChannelParameterBundle> channelParams;
 	
 	// Channel parameters
@@ -37,7 +37,7 @@ public class HQServerContext {
 		channelParams = new HashMap<>();
 
 		// Create marketdata
-		subcribers = new HQSubscribers(LOG);
+		subscribers = new HQSubscribers(LOG);
 	}
 
 	/**

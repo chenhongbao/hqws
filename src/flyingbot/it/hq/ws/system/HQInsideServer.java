@@ -148,10 +148,10 @@ public class HQInsideServer implements Runnable {
 			String type = o.getString(MetadataTag);
 			switch (type) {
 			case MarketData.DataType:
-				res = svrCtx.subcribers.onMarketData(MarketData.Parse(o));
+				res = svrCtx.subscribers.onMarketData(MarketData.Parse(o));
 				break;
 			case Candle.DataType:
-				res = svrCtx.subcribers.onCandle(Candle.Parse(o));
+				res = svrCtx.subscribers.onCandle(Candle.Parse(o));
 				break;
 			default:
 				res = new Result(Result.Error, -1, "Unknown market data type, " + type);

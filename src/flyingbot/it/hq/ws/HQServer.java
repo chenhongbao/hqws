@@ -74,7 +74,7 @@ public class HQServer {
 					}
 					
 					// Send heartbeats
-					Result r = serverCtx.subcribers.SendHeartbeatAll();
+					Result r = serverCtx.subscribers.SendHeartbeatAll();
 					if (r.equals(Result.Error)) {
 						serverCtx.LOG.warning(r.Message);
 					}
@@ -93,7 +93,7 @@ public class HQServer {
 		}
 		
 		// Close connection
-		serverCtx.subcribers.closeAll();
+		serverCtx.subscribers.closeAll();
 		group.shutdownGracefully();
 	}
 

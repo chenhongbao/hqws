@@ -102,10 +102,10 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
         } else {
             // Subscribe
             svrCtx.addInstrument(ctx.channel(), inst);
-            svrCtx.subcribers.subscribe(inst, ctx.channel());
+			svrCtx.subscribers.subscribe(inst, ctx.channel());
 
             // Send initial history data
-            svrCtx.subcribers.sendHistoryData(inst, ctx.channel(), numberCandle);
+			svrCtx.subscribers.sendHistoryData(inst, ctx.channel(), numberCandle);
 
             // Log info
             svrCtx.LOG.info("Client joins subscription pool, " + inst + ", " + ctx.channel());
@@ -114,7 +114,7 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 
     protected void unsubscribeInstrument(ChannelHandlerContext ctx, String inst) {
         // Unsubscribe
-        svrCtx.subcribers.unSubscribe(inst, ctx.channel());
+		svrCtx.subscribers.unSubscribe(inst, ctx.channel());
         svrCtx.removeInstrument(ctx.channel(), inst);
 
         // Log info
@@ -122,7 +122,7 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
     }
 
 	protected void sendDominantInstrument(ChannelHandlerContext ctx, String pid) {
-		String inst = svrCtx.subcribers.sendDominantInstrument(pid, ctx.channel());
+		String inst = svrCtx.subscribers.sendDominantInstrument(pid, ctx.channel());
 
 		// Log info
 		svrCtx.LOG.info("Find dominate instrument, " + pid + "->" + inst + ", " + ctx.channel());
