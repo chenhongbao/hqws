@@ -153,18 +153,19 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 				return;
 			}
 
+            String type = o.getString(TypeTag);
+
 			// Try subscription
 			for (int i = 0; i < arr.length(); ++i) {
 				String inst = arr.getString(i);
-				if (o.getString(TypeTag).compareTo(DataType_Sub) == 0) {
+                if (type.compareTo(DataType_Sub) == 0) {
 					subscribeInstrument(ctx, inst);
-				} else if (o.getString(TypeTag).compareTo(DataType_Uns) == 0) {
+                } else if (type.compareTo(DataType_Uns) == 0) {
 					unsubscribeInstrument(ctx, inst);
-				} else if (o.getString(TypeTag).compareTo(FindDominant) == 0) {
+                } else if (type.compareTo(FindDominant) == 0) {
 					sendDominantInstrument(ctx, inst);
 				} else {
-					svrCtx.LOG.warning("JSON request type error, received "
-							+ o.getString(TypeTag));
+                    svrCtx.LOG.warning("JSON request type error, received " + type);
 				}
 			}
 		} catch (Exception e) {
