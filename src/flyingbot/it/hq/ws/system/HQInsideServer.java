@@ -135,6 +135,11 @@ public class HQInsideServer implements Runnable {
 		}
 
 		public void onJSONArray(JSONArray arr) {
+			if (arr.length() < 1) {
+				// empty array
+				svrCtx.LOG.warning("Received empty data array. ");
+			}
+
 			for (int i = 0; i < arr.length(); ++i) {
 				JSONObject o = arr.getJSONObject(i);
 				onJSONObject(o);
